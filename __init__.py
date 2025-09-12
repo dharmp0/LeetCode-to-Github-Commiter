@@ -15,25 +15,28 @@ def commiter(difficulty, num, name, solution):
     fileName = f"{formattedNum}_{formattedName}"
 
     #open folder leetCodeSolved[difficulty]
-    os.startfile(fr"C:\Users\patel\Downloads\leetCodeSolved\{difficulty}")
+    repo_dir = Path(fr"C:\Users\patel\Downloads\leetCodeSolved\{difficulty}")
+
+    #changes directory to the appropriate one
+    os.chdir(repo_dir)
 
 
     #add file [problemNumber_problemNameParsed(i.e Two_Sum)]
     #opens file and writes solution
     with open(f"{fileName}.py", "w", encoding="utf-8") as fh:
-        fh.write("hello")
+        fh.write(f"{solution}")
 
     #run 
-        #git add .
-        #git commit -m "Create [fileName]"
-        #git push origin main
-        try:
-            subprocess.run(["git", "add", "."], check=True)
-            subprocess.run(["git", "commit", "-m", f"{fileName}"], check=True)
-            subprocess.run(["git", "push", "origin", "main"], check=True)
-        except subprocess.CalledProcessError as e:
-            print("Git command failed!")
-            print("Exit code:", e.returncode)
+    #git add .
+    #git commit -m "Create [fileName]"
+    #git push origin main
+    try:
+        subprocess.run(["git", "add", "."], check=True)
+        subprocess.run(["git", "commit", "-m", f"{fileName}"], check=True)
+        subprocess.run(["git", "push", "origin", "main"], check=True)
+    except subprocess.CalledProcessError as e:
+        print("Git command failed!")
+        print("Exit code:", e.returncode)
 
     return
 
