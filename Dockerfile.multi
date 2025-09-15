@@ -1,0 +1,16 @@
+# syntax=docker/dockerfile:1
+
+# Stage 1: Build
+FROM python:3.11-slim AS builder
+WORKDIR /app
+COPY . /app
+RUN if [ -f requirements.txt ]; then pip install --user --no-cache-dir -r requirements.txt; fi
+
+# Stage 2: Final
+FROM python:3.11-slim
+WORKDIR /app
+COPY --from=builder /app /app
+# Copy installed packages from builder
+ENV PATH="/root/.local/bin:$PATH"
+
+CMD ["python", "0000_Testing_Commiter.py"]

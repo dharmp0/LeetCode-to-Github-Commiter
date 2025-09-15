@@ -2,17 +2,36 @@ import os
 from pathlib import Path
 import subprocess
 
-difficulty = input("Difficulty -  ").lower()
-num = int(input("Problem Number -  "))
-name = input("Problem Name -  ")
-solution = input("Solution- ")
+def inputs():
+    difficulty = input("Difficulty -  ").lower()
+    num = int(input("Problem Number -  "))
+    name = input("Problem Name -  ")
+    return difficulty, num, name
 
-def commiter(difficulty, num, name, solution):
+def solution_input():
+    print("Solution (type 'end' in a new line when finished): ")
+    
+    solution = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        if line == "end":
+            break
+        solution.append(line)
 
+    solution = '\n'.join(solution) + '\n'
+    return solution
+
+def formated_name(num, name):
     #formating the file name
     formattedName = name.replace(" ", "_").title()
     formattedNum = f"{num:04}"
     fileName = f"{formattedNum}_{formattedName}"
+    return fileName
+
+def commiter(difficulty, fileName, solution):
 
     #open folder leetCodeSolved[difficulty]
     repo_dir = Path(fr"C:\Users\patel\Downloads\leetCodeSolved\{difficulty}")
@@ -38,6 +57,14 @@ def commiter(difficulty, num, name, solution):
         print("Git command failed!")
         print("Exit code:", e.returncode)
 
-    return
+    return "Committed Successfully"
 
-commiter(difficulty, num, name, solution)
+def main():
+    difficulty, num, name = inputs()
+    fileName = formated_name(num, name)
+    solution = solution_input()
+    result = commiter(difficulty, fileName, solution)
+    print(result)
+
+if __name__ == "__main__":
+    main()
