@@ -2,6 +2,26 @@ import os
 from pathlib import Path
 import subprocess
 
+# Map LeetCode language names to file extensions
+LANG_EXTENSIONS = {
+    "python":      "py",
+    "python3":     "py",
+    "java":        "java",
+    "javascript":  "js",
+    "typescript":  "ts",
+    "cpp":         "cpp",
+    "c":           "c",
+    "go":          "go",
+    "rust":        "rs",
+    "ruby":        "rb",
+    "swift":       "swift",
+    "kotlin":      "kt",
+    "scala":       "scala",
+    "csharp":      "cs",
+    "php":         "php",
+    "dart":        "dart",
+}
+
 def inputs():
     difficulty = input("Difficulty -  ").lower()
     num = int(input("Problem Number -  "))
@@ -26,36 +46,53 @@ def solution_input():
 
 def formated_name(num, name):
     #formating the file name
-    formattedName = name.replace(" ", "_").title()
+    import re
+    # Remove everything that isn't alphanumeric or a space, then convert
+    cleaned = re.sub(r"[^a-zA-Z0-9 ]", "", name)
+    # Collapse multiple spaces left behind by removed characters
+    cleaned = re.sub(r" +", " ", cleaned).strip()
+    formattedName = cleaned.replace(" ", "_").title()
     formattedNum = f"{num:04}"
     fileName = f"{formattedNum}_{formattedName}"
     return fileName
 
-def commiter(difficulty, fileName, solution):
+def commiter(difficulty, fileName, solution, language="python3"):
+    # Determine file extension from language
+    ext = LANG_EXTENSIONS.get(language.lower(), "py")
 
-    #open folder leetCodeSolved[difficulty]
-    repo_dir = Path(fr"C:\Users\patel\Downloads\leetCodeSolved\{difficulty}")
-
-    #changes directory to the appropriate one
+    # Navigate to the repo root
+    repo_dir = Path(fr"C:\Users\patel\Downloads\leetCodeSolved")
     os.chdir(repo_dir)
 
+    # Ensure the difficulty subfolder exists
+    diff_dir = repo_dir / difficulty
+    diff_dir.mkdir(parents=True, exist_ok=True)
 
-    #add file [problemNumber_problemNameParsed(i.e Two_Sum)]
-    #opens file and writes solution
-    with open(f"{fileName}.py", "w", encoding="utf-8") as fh:
-        fh.write(f"{solution}")
+    # Write the solution file inside the difficulty folder
+    file_path = diff_dir / f"{fileName}.{ext}"
+    with open(file_path, "w", encoding="utf-8") as fh:
+        fh.write(solution if solution.endswith('\n') else solution + '\n')
 
-    #run 
-    #git add .
-    #git commit -m "Create [fileName]"
-    #git push origin main
+    # git add, commit (if there are changes), pull (to sync), then push
     try:
         subprocess.run(["git", "add", "."], check=True)
-        subprocess.run(["git", "commit", "-m", f"{fileName}"], check=True)
+
+        # Commit — but don't fail if there's nothing new to commit
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", f"Add {fileName}"],
+            capture_output=True, text=True
+        )
+        if commit_result.returncode != 0 and "nothing to commit" not in commit_result.stdout:
+            print("Git commit failed!")
+            print(commit_result.stderr)
+            return f"Git commit failed! Exit code: {commit_result.returncode}"
+
+        subprocess.run(["git", "pull", "--rebase", "origin", "main"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
     except subprocess.CalledProcessError as e:
         print("Git command failed!")
         print("Exit code:", e.returncode)
+        return f"Git command failed! Exit code: {e.returncode}"
 
     return "Committed Successfully"
 
