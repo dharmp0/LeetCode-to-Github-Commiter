@@ -197,71 +197,74 @@ def interactive_select_submissions(submissions):
         label = f"{i:2}. #{num:04d}  {title}  [{diff:6}]  {lang}"
         choices.append(questionary.Choice(title=label, value=sub))
     
-    # Matrix-style header
-    print("\n\033[32m" + "═" * 70)
-    print("║" + " " * 20 + "LEETCODE SUBMISSION SELECTOR" + " " * 20 + "║")
-    print("═" * 70)
-    print("║  ↑/↓ Navigate       SPACE Select/Deselect       ENTER Continue     ║")
-    print("═" * 70 + "\033[0m\n")
-    
-    try:
-        selected = questionary.checkbox(
-            "Select submissions:",
-            choices=choices,
-            style=CLI_STYLE,
-            instruction="",
-        ).ask()
-    except KeyboardInterrupt:
-        print("\n\033[32mCancelled.\033[0m")
-        return [], []
-    
-    # Handle Ctrl+C or escape
-    if selected is None:
-        print("\n\033[32mCancelled.\033[0m")
-        return [], []
-    
-    # If nothing selected, ask if they want to quit or continue
-    if not selected:
-        print("\n\033[32mNo submissions selected.\033[0m")
+    # Loop for selection until user commits to an action or quits
+    while True:
+        # Matrix-style header
+        print("\n\033[32m" + "═" * 70)
+        print("║" + " " * 20 + "LEETCODE SUBMISSION SELECTOR" + " " * 20 + "║")
+        print("═" * 70)
+        print("║  ↑/↓ Navigate    SPACE Select    ENTER Continue    CTRL+C Quit    ║")
+        print("═" * 70 + "\033[0m\n")
+        
+        try:
+            selected = questionary.checkbox(
+                "Select submissions:",
+                choices=choices,
+                style=CLI_STYLE,
+                instruction="",
+            ).ask()
+        except KeyboardInterrupt:
+            print("\n\033[32mCancelled.\033[0m")
+            return [], []
+        
+        # Handle Ctrl+C or escape
+        if selected is None:
+            print("\n\033[32mCancelled.\033[0m")
+            return [], []
+        
+        # If nothing selected, ask if they want to quit or continue
+        if not selected:
+            print("\n\033[32mNo submissions selected.\033[0m")
+            try:
+                action = questionary.select(
+                    "What would you like to do?",
+                    choices=[
+                        questionary.Choice("Quit", value="quit"),
+                        questionary.Choice("Go back and select", value="retry"),
+                    ],
+                    style=CLI_STYLE,
+                ).ask()
+            except KeyboardInterrupt:
+                return [], []
+            
+            if action == "retry":
+                continue  # Loop back to selection
+            return [], []
+        
+        # Ask what to do with selected submissions
+        print(f"\n\033[32m{len(selected)} submission(s) selected.\033[0m")
         try:
             action = questionary.select(
-                "What would you like to do?",
+                "Action for selected:",
                 choices=[
-                    questionary.Choice("Quit", value="quit"),
-                    questionary.Choice("Go back and select", value="retry"),
+                    questionary.Choice("⬆ PUSH to GitHub", value="push"),
+                    questionary.Choice("⏭ SKIP FOREVER (already uploaded)", value="skip"),
+                    questionary.Choice("↩ Go back", value="back"),
                 ],
                 style=CLI_STYLE,
             ).ask()
         except KeyboardInterrupt:
+            print("\n\033[32mCancelled.\033[0m")
             return [], []
         
-        if action == "retry":
-            return interactive_select_submissions(submissions)
-        return [], []
-    
-    # Ask what to do with selected submissions
-    print(f"\n\033[32m{len(selected)} submission(s) selected.\033[0m")
-    try:
-        action = questionary.select(
-            "Action for selected:",
-            choices=[
-                questionary.Choice("⬆ PUSH to GitHub", value="push"),
-                questionary.Choice("⏭ SKIP FOREVER (already uploaded)", value="skip"),
-                questionary.Choice("✖ Cancel", value="cancel"),
-            ],
-            style=CLI_STYLE,
-        ).ask()
-    except KeyboardInterrupt:
-        print("\n\033[32mCancelled.\033[0m")
-        return [], []
-    
-    if action == "push":
-        return selected, []
-    elif action == "skip":
-        return [], selected
-    else:
-        print("\n\033[32mCancelled.\033[0m")
-        return [], []
+        if action == "push":
+            return selected, []
+        elif action == "skip":
+            return [], selected
+        elif action == "back":
+            continue  # Loop back to selection
+        else:
+            return [], []
 
 
 def batch_process_submissions(selected_subs, seen):
