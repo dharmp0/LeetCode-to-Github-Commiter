@@ -3,9 +3,21 @@ import json
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import questionary
+from questionary import Style
 
 # Import your existing committer logic
 from __init__ import formated_name, commiter, LANG_EXTENSIONS
+
+# Custom style for the checkbox UI
+CLI_STYLE = Style([
+    ('qmark', 'fg:cyan bold'),
+    ('question', 'bold'),
+    ('pointer', 'fg:cyan bold'),
+    ('highlighted', 'fg:cyan bold'),
+    ('selected', 'fg:green bold'),
+    ('answer', 'fg:green'),
+])
 
 load_dotenv()
 
@@ -136,6 +148,103 @@ def process_submission(sub):
         print("  Skipped for now (will ask again next run).")
         return "later"
 
+# ── Interactive selection UI ─────────────────────────────────────────────────
+
+def get_submission_preview(sub):
+    """Fetch details for a submission to show in the selection UI."""
+    detail = get_submission_detail(sub["id"])
+    if not detail:
+        return None
+    return {
+        "id": sub["id"],
+        "title": sub["title"],
+        "titleSlug": sub["titleSlug"],
+        "difficulty": detail["question"]["difficulty"],
+        "language": detail["lang"]["name"],
+        "questionId": detail["question"]["questionId"],
+        "code": detail["code"],
+    }
+
+
+def interactive_select_submissions(submissions):
+    """Display an interactive checkbox UI for selecting submissions to push."""
+    print("\nFetching submission details...")
+    
+    # Fetch details for all submissions
+    detailed_subs = []
+    for sub in submissions:
+        preview = get_submission_preview(sub)
+        if preview:
+            detailed_subs.append(preview)
+        else:
+            print(f"  Could not fetch details for '{sub['title']}', skipping.")
+    
+    if not detailed_subs:
+        print("No submissions to display.")
+        return []
+    
+    # Build choices for the checkbox UI
+    # Format: [difficulty] #num - Title (language)
+    choices = []
+    for sub in detailed_subs:
+        diff_label = sub["difficulty"].upper()[:1]  # E/M/H
+        num = int(sub["questionId"])
+        label = f"[{diff_label}] #{num:04d} - {sub['title']} ({sub['language']})"
+        choices.append(questionary.Choice(title=label, value=sub))
+    
+    print("\n" + "─" * 60)
+    print("Use ↑/↓ to navigate, SPACE to select/deselect, ENTER to confirm")
+    print("─" * 60 + "\n")
+    
+    selected = questionary.checkbox(
+        "Select submissions to push to GitHub:",
+        choices=choices,
+        style=CLI_STYLE,
+    ).ask()
+    
+    # Handle Ctrl+C or escape
+    if selected is None:
+        print("\nCancelled.")
+        return []
+    
+    return selected
+
+
+def batch_process_submissions(selected_subs, seen):
+    """Process and push all selected submissions to GitHub."""
+    if not selected_subs:
+        print("No submissions selected.")
+        return
+    
+    print(f"\nPushing {len(selected_subs)} submission(s) to GitHub...\n")
+    
+    pushed_count = 0
+    for i, sub in enumerate(selected_subs, 1):
+        difficulty = sub["difficulty"].lower()
+        num = int(sub["questionId"])
+        name = sub["title"]
+        language = sub["language"]
+        code = sub["code"]
+        
+        file_name = formated_name(num, name)
+        ext = LANG_EXTENSIONS.get(language.lower(), "py")
+        
+        print(f"[{i}/{len(selected_subs)}] Pushing #{num} – {name} ({language})...")
+        
+        result = commiter(difficulty, file_name, code, language)
+        
+        if "Successfully" in result:
+            print(f"  ✓ {file_name}.{ext}")
+            seen.add(sub["id"])
+            save_seen(seen)
+            pushed_count += 1
+        else:
+            print(f"  ✗ Failed: {result}")
+    
+    print(f"\n{'─' * 60}")
+    print(f"Done! Pushed {pushed_count}/{len(selected_subs)} submission(s).")
+
+
 # ── One-shot mode: process recent submissions right now ──────────────────────
 
 def sync_recent(limit=10):
@@ -153,21 +262,13 @@ def sync_recent(limit=10):
         print("All recent submissions already pushed. Nothing to do.")
         return
 
-    print(f"Found {len(new_subs)} new submission(s) out of {len(submissions)} recent.\n")
-
-    for sub in new_subs:
-        print(f"  • {sub['title']}")
-
-    for sub in new_subs:
-        print(f"\n── {sub['title']} (id {sub['id']}) ──")
-        result = process_submission(sub)
-
-        # Only mark as seen if pushed or explicitly skipped forever
-        if result in ("pushed", "skipped"):
-            seen.add(sub["id"])
-            save_seen(seen)
-
-    print("\nDone.")
+    print(f"Found {len(new_subs)} new submission(s) out of {len(submissions)} recent.")
+    
+    # Use interactive selection UI
+    selected = interactive_select_submissions(new_subs)
+    
+    # Process all selected submissions
+    batch_process_submissions(selected, seen)
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────

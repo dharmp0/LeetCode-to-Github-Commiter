@@ -25,7 +25,7 @@ cd LeetCode-to-GitHub-Commiter
 
 ### 2. Install dependencies
 ```bash
-pip install python-dotenv requests
+pip install python-dotenv requests questionary
 ```
 
 ### 3. Create a `.env` file
@@ -57,28 +57,28 @@ git remote -v   # should show your GitHub remote
 ```bash
 python leetcode_api.py
 ```
-This fetches your recent accepted submissions and prompts for each:
+This fetches your recent accepted submissions and shows an **interactive selection UI**:
 ```
 Found 3 new submission(s) out of 10 recent.
 
-  • Two Sum
-  • Add Binary
-  • Valid Parentheses
+Fetching submission details...
 
-── Two Sum (id 12345678) ──
-  Problem:    #1 – Two Sum
-  Difficulty: easy
-  Language:   python3
-  File:       0001_Two_Sum.py
-  Push to GitHub? (y/s/n)
-  y = push, s = skip forever, n = skip for now:
+────────────────────────────────────────────────────────────
+Use ↑/↓ to navigate, SPACE to select/deselect, ENTER to confirm
+────────────────────────────────────────────────────────────
+
+? Select submissions to push to GitHub:
+  ○ [E] #0001 - Two Sum (python3)
+❯ ● [M] #0015 - 3Sum (java)
+  ○ [H] #0042 - Trapping Rain Water (cpp)
 ```
 
-| Input | Action |
-|-------|--------|
-| `y` | Push to GitHub, won't ask again |
-| `s` | Skip permanently, won't ask again |
-| `n` | Skip for now, will ask again next run |
+| Key | Action |
+|-----|--------|
+| `↑`/`↓` | Navigate between submissions |
+| `Space` | Toggle selection (●/○) |
+| `Enter` | Push all selected to GitHub |
+| `Ctrl+C` | Cancel |
 
 ### Manual CLI mode
 ```bash
