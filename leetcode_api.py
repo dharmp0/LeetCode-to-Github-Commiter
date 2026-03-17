@@ -9,14 +9,16 @@ from questionary import Style
 # Import your existing committer logic
 from __init__ import formated_name, commiter, LANG_EXTENSIONS
 
-# Custom style for the checkbox UI
+# Matrix-style black/green theme
 CLI_STYLE = Style([
-    ('qmark', 'fg:cyan bold'),
-    ('question', 'bold'),
-    ('pointer', 'fg:cyan bold'),
-    ('highlighted', 'fg:cyan bold'),
-    ('selected', 'fg:green bold'),
-    ('answer', 'fg:green'),
+    ('qmark', 'fg:#00ff00 bold'),           # Bright green question mark
+    ('question', 'fg:#00ff00 bold'),         # Bright green question text
+    ('pointer', 'fg:#00ff00 bold'),          # Green arrow pointer
+    ('highlighted', 'fg:#00ff00 bold'),      # Highlighted option
+    ('selected', 'fg:#00ff00 bold'),         # Selected checkbox
+    ('text', 'fg:#00ff00'),                  # Regular text
+    ('answer', 'fg:#00ff00 bold'),           # Answer confirmation
+    ('instruction', 'fg:#008800'),           # Dimmer green for instructions
 ])
 
 load_dotenv()
@@ -168,7 +170,7 @@ def get_submission_preview(sub):
 
 def interactive_select_submissions(submissions):
     """Display an interactive checkbox UI for selecting submissions to push."""
-    print("\nFetching submission details...")
+    print("\n\033[32mFetching submission details...\033[0m")
     
     # Fetch details for all submissions
     detailed_subs = []
@@ -177,46 +179,100 @@ def interactive_select_submissions(submissions):
         if preview:
             detailed_subs.append(preview)
         else:
-            print(f"  Could not fetch details for '{sub['title']}', skipping.")
+            print(f"\033[32m  Could not fetch details for '{sub['title']}', skipping.\033[0m")
     
     if not detailed_subs:
-        print("No submissions to display.")
-        return []
+        print("\033[32mNo submissions to display.\033[0m")
+        return [], []
     
     # Build choices for the checkbox UI
-    # Format: [difficulty] #num - Title (language)
+    # Format: numbered DOS-style menu
     choices = []
-    for sub in detailed_subs:
-        diff_label = sub["difficulty"].upper()[:1]  # E/M/H
+    for i, sub in enumerate(detailed_subs, 1):
+        diff = sub["difficulty"].upper()
         num = int(sub["questionId"])
-        label = f"[{diff_label}] #{num:04d} - {sub['title']} ({sub['language']})"
+        # Pad title for alignment
+        title = sub['title'][:35].ljust(35)
+        lang = sub['language']
+        label = f"{i:2}. #{num:04d}  {title}  [{diff:6}]  {lang}"
         choices.append(questionary.Choice(title=label, value=sub))
     
-    print("\n" + "─" * 60)
-    print("Use ↑/↓ to navigate, SPACE to select/deselect, ENTER to confirm")
-    print("─" * 60 + "\n")
+    # Matrix-style header
+    print("\n\033[32m" + "═" * 70)
+    print("║" + " " * 20 + "LEETCODE SUBMISSION SELECTOR" + " " * 20 + "║")
+    print("═" * 70)
+    print("║  ↑/↓ Navigate       SPACE Select/Deselect       ENTER Continue     ║")
+    print("═" * 70 + "\033[0m\n")
     
-    selected = questionary.checkbox(
-        "Select submissions to push to GitHub:",
-        choices=choices,
-        style=CLI_STYLE,
-    ).ask()
+    try:
+        selected = questionary.checkbox(
+            "Select submissions:",
+            choices=choices,
+            style=CLI_STYLE,
+            instruction="",
+        ).ask()
+    except KeyboardInterrupt:
+        print("\n\033[32mCancelled.\033[0m")
+        return [], []
     
     # Handle Ctrl+C or escape
     if selected is None:
-        print("\nCancelled.")
-        return []
+        print("\n\033[32mCancelled.\033[0m")
+        return [], []
     
-    return selected
+    # If nothing selected, ask if they want to quit or continue
+    if not selected:
+        print("\n\033[32mNo submissions selected.\033[0m")
+        try:
+            action = questionary.select(
+                "What would you like to do?",
+                choices=[
+                    questionary.Choice("Quit", value="quit"),
+                    questionary.Choice("Go back and select", value="retry"),
+                ],
+                style=CLI_STYLE,
+            ).ask()
+        except KeyboardInterrupt:
+            return [], []
+        
+        if action == "retry":
+            return interactive_select_submissions(submissions)
+        return [], []
+    
+    # Ask what to do with selected submissions
+    print(f"\n\033[32m{len(selected)} submission(s) selected.\033[0m")
+    try:
+        action = questionary.select(
+            "Action for selected:",
+            choices=[
+                questionary.Choice("⬆ PUSH to GitHub", value="push"),
+                questionary.Choice("⏭ SKIP FOREVER (already uploaded)", value="skip"),
+                questionary.Choice("✖ Cancel", value="cancel"),
+            ],
+            style=CLI_STYLE,
+        ).ask()
+    except KeyboardInterrupt:
+        print("\n\033[32mCancelled.\033[0m")
+        return [], []
+    
+    if action == "push":
+        return selected, []
+    elif action == "skip":
+        return [], selected
+    else:
+        print("\n\033[32mCancelled.\033[0m")
+        return [], []
 
 
 def batch_process_submissions(selected_subs, seen):
     """Process and push all selected submissions to GitHub."""
     if not selected_subs:
-        print("No submissions selected.")
+        print("\033[32mNo submissions selected.\033[0m")
         return
     
-    print(f"\nPushing {len(selected_subs)} submission(s) to GitHub...\n")
+    print(f"\n\033[32m{'═' * 70}")
+    print(f"  PUSHING {len(selected_subs)} SUBMISSION(S) TO GITHUB...")
+    print(f"{'═' * 70}\033[0m\n")
     
     pushed_count = 0
     for i, sub in enumerate(selected_subs, 1):
@@ -229,20 +285,21 @@ def batch_process_submissions(selected_subs, seen):
         file_name = formated_name(num, name)
         ext = LANG_EXTENSIONS.get(language.lower(), "py")
         
-        print(f"[{i}/{len(selected_subs)}] Pushing #{num} – {name} ({language})...")
+        print(f"\033[32m[{i}/{len(selected_subs)}] #{num:04d} – {name} ({language})...\033[0m")
         
         result = commiter(difficulty, file_name, code, language)
         
         if "Successfully" in result:
-            print(f"  ✓ {file_name}.{ext}")
+            print(f"\033[32m     ✓ {file_name}.{ext}\033[0m")
             seen.add(sub["id"])
             save_seen(seen)
             pushed_count += 1
         else:
-            print(f"  ✗ Failed: {result}")
+            print(f"\033[31m     ✗ Failed: {result}\033[0m")
     
-    print(f"\n{'─' * 60}")
-    print(f"Done! Pushed {pushed_count}/{len(selected_subs)} submission(s).")
+    print(f"\n\033[32m{'═' * 70}")
+    print(f"  COMPLETE: {pushed_count}/{len(selected_subs)} submission(s) pushed successfully")
+    print(f"{'═' * 70}\033[0m")
 
 
 # ── One-shot mode: process recent submissions right now ──────────────────────
@@ -253,19 +310,26 @@ def sync_recent(limit=10):
     submissions = get_recent_submissions(limit)
 
     if not submissions:
-        print("No recent accepted submissions found.")
+        print("\033[32mNo recent accepted submissions found.\033[0m")
         return
 
     new_subs = [s for s in submissions if s["id"] not in seen]
 
     if not new_subs:
-        print("All recent submissions already pushed. Nothing to do.")
+        print("\033[32mAll recent submissions already pushed. Nothing to do.\033[0m")
         return
 
-    print(f"Found {len(new_subs)} new submission(s) out of {len(submissions)} recent.")
+    print(f"\033[32mFound {len(new_subs)} new submission(s) out of {len(submissions)} recent.\033[0m")
     
     # Use interactive selection UI
-    selected = interactive_select_submissions(new_subs)
+    selected, skip_forever = interactive_select_submissions(new_subs)
+    
+    # Mark skipped submissions as seen (won't ask again)
+    if skip_forever:
+        for sub in skip_forever:
+            seen.add(sub["id"])
+        save_seen(seen)
+        print(f"\033[32m\nMarked {len(skip_forever)} submission(s) as skipped forever.\033[0m")
     
     # Process all selected submissions
     batch_process_submissions(selected, seen)
@@ -276,8 +340,8 @@ def sync_recent(limit=10):
 if __name__ == "__main__":
     # Quick sanity check
     if not SESSION or not CSRF or not USERNAME:
-        print("ERROR: Missing environment variables.")
-        print("Make sure your .env file has LEETCODE_SESSION, CSRF_TOKEN, and LEETCODE_USERNAME.")
+        print("\033[31mERROR: Missing environment variables.\033[0m")
+        print("\033[31mMake sure your .env file has LEETCODE_SESSION, CSRF_TOKEN, and LEETCODE_USERNAME.\033[0m")
         exit(1)
 
     sync_recent(limit=10)
